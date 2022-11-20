@@ -3,15 +3,15 @@ import socket
 import struct
 localIP     = "127.0.0.1"
 localPort   = 123
-NTPFORMAT = ">3B b 3I 4Q"
+NTPFORMAT = "!B B B b 11I"
 
 hz = int(1 / time.clock_getres(time.CLOCK_REALTIME))
-precision = 0
+acc = 0
 
-print("Calculando...")
+print("Calculando precision...")
 #Calcula precision
 while hz > 1:
-        precision -= 1
+        acc -= 1
         hz >>= 1
 print("listo")
 ####
@@ -27,21 +27,11 @@ def system_to_ntp(t=0.0):
     t+= NTPDELTA
     return (int(t) <<32) + (int(abs(t-int(t)*(1<<32))))
 
-'''
-def ntp_to_system(x=0):
-    #------#
-    #Transform NTP timestamp to system timestamp
-    #------#
-    t = float (x>>32) + float(x & 0xffffffff )/(1<<32)
-    return t - NTPDELTA
-def tfmt(t = 0.0):
-        ###
-        #Format System Timestamp
-        ###
+def to_time(integ, frac, n=32):
+    return integ + float(frac)/2**n	
 
-        return datetime.datetime.fromtimestamp(t).strftime("%Y-%m-%d_%H:%M:%S.%f")
-'''
-
+def to_frac(timestamp, n=32):
+    return int(abs(timestamp - _to_int(timestamp)) * 2**n)
 
 # Create a datagram socket
 UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -52,29 +42,40 @@ UDPServerSocket.bind((localIP, localPort))
 
 # Listen for incoming datagrams
 while(True):
-    print("hola")
     data, addr = UDPServerSocket.recvfrom(struct.calcsize(NTPFORMAT))
     serverrecv = system_to_ntp(time.time())
     data = list(data)
-    version = data[0] >> 3 & 0x7
-    if (version >= 4):
-        print("Version mayor que 3")
-        break
-    mode = data[0] & 0x7
-    clienttx = data[10]
     
-    data[0] = version << 3 | 4      # Leap, Version, Mode
-    data[1] = 0                     # Stratum
-    data[2] = 6                     # Poll
-    data[3] = precision             # Precision
-    data[4] = 0                     # Root delay  
-    data[5] = 0                     # Root Dispersion
-    data[6] = 0                     # Reference Clock Identifier
-    data[7] = serverrecv            # Reference Timestamp
-    data[8] = clienttx              # Originate Timestamp
-    data[9] = serverrecv            # Receive Timestamp
-    data[10] = system_to_ntp(time.time())     # Transmit Timestamp
+    #Desempaquetar valores
+    leap = data[0] >> 6 & 0x3
+    version = data[0] >> 3 & 0x7
+    mode = data[0] & 0x7
+    stratum = data[1]
+    poll = data[2]
+    precision = data[3]
+    root_delay = float(data[4]/2**16)
+    root_dispersion = float(data[5])/2**16
+    ref_id = data[6]
+    ref_timestamp = to_time(data[7], data[8])
+    orig_timestamp = to_time(data[9], data[10])
+    recv_timestamp = to_time(data[11], data[12])
+    tx_timestamp = to_time(data[13], data[14])
 
-    # send the response
-    data = struct.pack(NTPFORMAT, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10])
+    #Procesar valores
+    leap = 0
+    mode = 4
+    stratum = 2             #Referencia secundaria
+    precision = acc
+    root_delay = 0
+    root_dispersion = 0     #calcular segun shoa
+    ref_id = 0xc81b6a73     #200.27.106.115 to hex
+    ref_timestamp= serverrecv
+    recv_timestamp = serverrecv
+    tx_timestamp = system_to_ntp(time.time())
+    
+    # Enviar respuesta
+    data = struct.pack(NTPFORMAT, leap << 6 | version << 3 | mode, stratum, poll, precision, int(root_delay) << 16 | to_frac(root_delay,16),
+     int(root_dispersion) << 16 | to_frac(root_dispersion,16), ref_id, int(ref_timestamp), to_frac(ref_timestamp), int(orig_timestamp), to_frac(orig_timestamp),
+     int(recv_timestamp), to_frac(recv_timestamp), int(tx_timestamp), to_frac(tx_timestamp))
+    
     UDPServerSocket.sendto(data, addr)
