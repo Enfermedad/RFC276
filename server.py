@@ -79,18 +79,17 @@ while(True):
     #Procesar valores
     leap = 0
     mode = 4
-    stratum = 2            #Referencia secundaria
+    stratum = 0            
     precision = acc
     root_delay = 0
-    root_dispersion = 0     #calcular segun shoa
-    ref_id =0    #
+    root_dispersion = 0    
+    ref_id =0    
     ref_timestamp= serverrecv
-   # print(serverrecv)
     recv_timestamp = serverrecv
     timetx= time.time()
     tx_timestamp = system_to_ntp(timetx)
-    # Enviar respuesta
-    #data = struct.pack(NTPFORMAT, leap << 6 | version << 3 | mode, stratum, poll, precision, int(root_delay) << 16 | to_frac(root_delay,16),int(root_dispersion) << 16 | to_frac(root_dispersion,16), ref_id, int(ref_timestamp), to_frac(ref_timestamp), int(orig_timestamp), to_frac(orig_timestamp),int(recv_timestamp), to_frac(recv_timestamp), int(tx_timestamp), to_frac(tx_timestamp))
+
+    #Empaquetar
     data = struct.pack(NTPFORMAT,
      (leap << 6 | version << 3 | mode)
      , stratum
@@ -99,7 +98,7 @@ while(True):
      , int(root_delay) << 16 | to_frac(root_delay,16)
      ,int(root_dispersion) << 16 | to_frac(root_dispersion,16)
      ,ref_id
-     ,int(ref_timestamp)#int(ref_timestamp)
+     ,int(ref_timestamp)
      ,to_frac(ref_timestamp)
      ,int(orig_timestamp)
      ,to_frac(orig_timestamp)
@@ -108,5 +107,5 @@ while(True):
      ,int(tx_timestamp)
      ,to_frac(tx_timestamp)
      )
-  #  print(data)
+
     UDPServerSocket.sendto(data, addr)
