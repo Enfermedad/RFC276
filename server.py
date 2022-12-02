@@ -79,11 +79,11 @@ while(True):
     #Procesar valores
     leap = 0
     mode = 4
-    stratum = 0             #Referencia secundaria
+    stratum = 2            #Referencia secundaria
     precision = acc
     root_delay = 0
     root_dispersion = 0     #calcular segun shoa
-    ref_id =0    #200.27.106.115 to hex
+    ref_id =0    #
     ref_timestamp= serverrecv
    # print(serverrecv)
     recv_timestamp = serverrecv
